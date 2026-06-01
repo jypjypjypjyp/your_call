@@ -101,6 +101,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           if (success) {
             vscode.window.showInformationMessage(`已应用方案: ${suggestion.title}`);
           }
+        }).catch(err => {
+          vscode.window.showErrorMessage(`应用失败: ${err.message}`);
         });
       }
     } catch (e: unknown) {
@@ -116,6 +118,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     vscode.workspace.openTextDocument({ content: diffContent, language: 'diff' }).then(doc => {
       vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
+    }, err => {
+      vscode.window.showErrorMessage(`打开 diff 失败: ${err.message}`);
     });
   }
 }
