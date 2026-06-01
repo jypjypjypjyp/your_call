@@ -1,0 +1,94 @@
+{
+  "name": "ai-completion",
+  "displayName": "AI Completion",
+  "description": "AI-powered code completion for VS Code",
+  "version": "0.1.0",
+  "publisher": "",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:aiCompletion.openSidebar"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aiCompletion.openSidebar",
+        "title": "Open AI Completion Sidebar"
+      },
+      {
+        "command": "aiCompletion.configureApiKey",
+        "title": "Configure AI Completion API Key"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "aiCompletion.openSidebar",
+        "key": "ctrl+shift+space",
+        "when": "editorFocus"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ai-completion",
+          "title": "AI Completion"
+        }
+      ]
+    },
+    "views": {
+      "ai-completion": [
+        {
+          "type": "webview",
+          "id": "aiCompletion.sidebar",
+          "name": "AI Completion"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AI Completion",
+      "properties": {
+        "aiCompletion.apiBaseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "Base URL for the API endpoint"
+        },
+        "aiCompletion.model": {
+          "type": "string",
+          "default": "gpt-4o",
+          "description": "Model name to use for completions"
+        },
+        "aiCompletion.maxFileLines": {
+          "type": "number",
+          "default": 500,
+          "description": "Maximum number of lines to include from a file"
+        },
+        "aiCompletion.maxOpenFiles": {
+          "type": "number",
+          "default": 10,
+          "description": "Maximum number of open files to consider for context"
+        },
+        "aiCompletion.suggestionCount": {
+          "type": "number",
+          "default": 3,
+          "description": "Number of suggestions to generate"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0",
+    "vsce": "^2.15.0"
+  }
+}
