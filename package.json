@@ -82,6 +82,7 @@
   },
   "scripts": {
     "build": "node esbuild.js",
+    "vscode:prepublish": "npm run build",
     "watch": "node esbuild.js --watch",
     "package": "vsce package"
   },
