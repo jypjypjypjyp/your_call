@@ -3,7 +3,12 @@
   "displayName": "YourCall",
   "description": "%extension.description%",
   "version": "0.1.0",
-  "publisher": "",
+  "publisher": "jypjypjypjyp",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jypjypjypjyp/your_call.git"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
