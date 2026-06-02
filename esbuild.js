@@ -7,7 +7,7 @@ const config = {
   entryPoints: ['src/extension.ts'],
   outfile: 'dist/extension.js',
   bundle: true,
-  external: ['vscode'],
+  external: ['vscode', 'node-pty'],
   platform: 'node',
   format: 'cjs',
   sourcemap: isWatch,

@@ -1,7 +1,7 @@
 {
-  "name": "ai-completion",
-  "displayName": "AI Completion",
-  "description": "AI-powered code completion for VS Code",
+  "name": "yourcall",
+  "displayName": "YourCall",
+  "description": "极简 Coding Agent 扩展 — 不为改变你的习惯，只为服务你的Agent",
   "version": "0.1.0",
   "publisher": "",
   "engines": {
@@ -24,20 +24,46 @@
       {
         "command": "aiCompletion.configureApiKey",
         "title": "Configure AI Completion API Key"
-      }
-    ],
-    "keybindings": [
+      },
       {
-        "command": "aiCompletion.openSidebar",
-        "key": "ctrl+shift+space",
-        "when": "editorFocus"
+        "command": "aiCompletion.selectModel",
+        "title": "AI Completion: Select Model"
+      },
+      {
+        "command": "yourcall.copyCode",
+        "title": "复制代码位置给 AI"
+      },
+      {
+        "command": "yourcall.copyFilePath",
+        "title": "复制文件路径给 AI"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorHasSelection",
+          "command": "yourcall.copyCode",
+          "group": "navigation@1.5"
+        },
+        {
+          "when": "!editorHasSelection",
+          "command": "yourcall.copyFilePath",
+          "group": "navigation@1.6"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "yourcall.copyFilePath",
+          "group": "navigation@1.6"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
           "id": "ai-completion",
-          "title": "AI Completion"
+          "title": "AI Completion",
+          "icon": "media/activity-bar.svg"
         }
       ]
     },
@@ -46,7 +72,14 @@
         {
           "type": "webview",
           "id": "aiCompletion.sidebar",
-          "name": "AI Completion"
+          "name": "AI Completion",
+          "icon": "$(lightbulb)"
+        },
+        {
+          "type": "webview",
+          "id": "aiCompletion.agent",
+          "name": "Agent CLI",
+          "icon": "$(terminal)"
         }
       ]
     },
@@ -62,6 +95,11 @@
           "type": "string",
           "default": "gpt-4o",
           "description": "Model name to use for completions"
+        },
+        "aiCompletion.agentCommand": {
+          "type": "string",
+          "default": "",
+          "description": "Agent CLI 命令，如 claude, opencode, aider。留空则在侧边栏选择"
         },
         "aiCompletion.maxFileLines": {
           "type": "number",
@@ -94,5 +132,10 @@
     "typescript": "^5.4.0",
     "vitest": "^4.1.7",
     "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0"
   }
 }

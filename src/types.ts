@@ -19,4 +19,13 @@ export type WebViewMessage =
   | { type: 'applySuggestion'; suggestion: Suggestion }
   | { type: 'regenerate'; userIntent: string }
   | { type: 'viewDiff'; suggestion: Suggestion }
-  | { type: 'ready' };
+  | { type: 'selectModel' };
+
+export type ExtensionMessage =
+  | { type: 'modelChanged'; model: string }
+  | { type: 'suggestions'; suggestions: Suggestion[] }
+  | { type: 'error'; message: string }
+  | { type: 'loading' }
+  | { type: 'streamStart' }
+  | { type: 'streamChunk'; reasoning: string; content: string }
+  | { type: 'streamEnd' };

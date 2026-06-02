@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#252526"/>
+      <stop offset="100%" stop-color="#1e1e1e"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="16" fill="url(#bg)" stroke="#444" stroke-width="2"/>
+  <text x="10" y="58" font-family="Georgia, 'Times New Roman', serif" font-size="18" fill="#81c784" font-weight="bold" font-style="italic">&gt; your call</text>
+  <text x="10" y="90" font-family="Georgia, 'Times New Roman', serif" font-size="20" fill="#4fc3f7" font-style="italic">your agent</text>
+</svg>

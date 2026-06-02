@@ -1,14 +1,21 @@
 import * as vscode from 'vscode';
-import { Suggestion, WebViewMessage } from './types';
+import { Suggestion, WebViewMessage, ExtensionMessage } from './types';
 import { getSidebarHtml } from './sidebar';
 import { collectContext } from './ContextCollector';
-import { fetchSuggestions } from './CompletionApi';
+import { fetchSuggestions, streamSuggestions } from './CompletionApi';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'aiCompletion.sidebar';
   private _view?: vscode.WebviewView;
 
-  constructor(private readonly _secretStorage: vscode.SecretStorage) {}
+  private get currentModel(): string {
+    return vscode.workspace.getConfiguration('aiCompletion').get<string>('model', '');
+  }
+
+  constructor(
+    private readonly _secretStorage: vscode.SecretStorage,
+    private readonly _extensionUri: vscode.Uri
+  ) {}
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -16,14 +23,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): void {
     this._view = webviewView;
-    webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.html = getSidebarHtml([], false, '');
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this._extensionUri],
+    };
+    webviewView.webview.html = getSidebarHtml([], false, '输入意图（可选），点击"生成建议"', this.currentModel);
 
     webviewView.webview.onDidReceiveMessage(async (msg: WebViewMessage) => {
       switch (msg.type) {
-        case 'ready':
-          this.autoComplete();
-          break;
         case 'regenerate':
           this.autoComplete(msg.userIntent);
           break;
@@ -33,40 +40,60 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case 'viewDiff':
           this.viewDiff(msg.suggestion);
           break;
+        case 'selectModel':
+          await this.selectModel();
+          break;
       }
     });
+
+    webviewView.onDidDispose(() => {
+      this._view = undefined;
+    });
+
   }
 
   private async autoComplete(userIntent = ''): Promise<void> {
     if (!this._view) return;
 
     try {
-      this._view.webview.html = getSidebarHtml([], true, '');
-      this._view.title = 'AI 代码补全 (分析中...)';
-
-      const { documents, cursorFile, cursorLine } = collectContext();
+      const { documents, cursorFile, cursorLine, selectionStart, selectionEnd } = collectContext();
 
       if (documents.length === 0) {
-        this._view.webview.html = getSidebarHtml([], false, '请先打开代码文件');
+        this._view.webview.html = getSidebarHtml([], false, '请先打开代码文件', this.currentModel);
         this._view.title = 'AI 代码补全';
         return;
       }
 
       const apiKey = (await this._secretStorage.get('aiCompletion.apiKey')) ?? '';
       if (!apiKey) {
-        this._view.webview.html = getSidebarHtml([], false, '请先在设置中配置 API Key');
+        this._view.webview.html = getSidebarHtml([], false, '请先在设置中配置 API Key', this.currentModel);
         this._view.title = 'AI 代码补全';
         return;
       }
 
-      const suggestions = await fetchSuggestions(documents, cursorFile, cursorLine, userIntent, apiKey);
-      this._view.webview.html = getSidebarHtml(suggestions, false, '');
+      // Switch to streaming view
+      this._view.webview.html = getSidebarHtml([], false, '', this.currentModel, true);
+      this._view.title = 'AI 代码补全 (生成中...)';
+
+      const suggestions = await streamSuggestions(
+        documents, cursorFile, cursorLine, userIntent, apiKey,
+        (reasoning, content) => {
+          this._view?.webview.postMessage({ type: 'streamChunk', reasoning, content });
+        },
+        selectionStart, selectionEnd,
+      );
+
+      // Streaming done — switch to card view
+      this._view.webview.postMessage({ type: 'streamEnd' });
+      this._view.webview.html = getSidebarHtml(suggestions, false, '', this.currentModel);
       this._view.title = `AI 代码补全 (${suggestions.length} 个方案)`;
     } catch (e: unknown) {
-      const msg = e instanceof Error && e.message.includes('API Key')
-        ? '请先在设置中配置 API Key'
-        : `请求失败: ${e instanceof Error ? e.message : String(e)}`;
-      this._view.webview.html = getSidebarHtml([], false, msg);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      vscode.window.showErrorMessage(`[AI Completion] ${errMsg}`);
+      const displayMsg = errMsg.includes('Invalid model')
+        ? `模型无效，请运行命令 "AI Completion: Select Model" 选择合适的模型\n\n${errMsg}`
+        : errMsg;
+      this._view.webview.html = getSidebarHtml([], false, displayMsg, this.currentModel);
       this._view.title = 'AI 代码补全';
     }
   }
@@ -121,6 +148,46 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     }, err => {
       vscode.window.showErrorMessage(`打开 diff 失败: ${err.message}`);
     });
+  }
+
+  private async selectModel(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('aiCompletion');
+    const baseUrl = cfg.get<string>('apiBaseUrl', 'https://api.openai.com/v1');
+    const apiKey = await this._secretStorage.get('aiCompletion.apiKey');
+    if (!apiKey) {
+      vscode.window.showErrorMessage('请先配置 API Key');
+      return;
+    }
+
+    const { listModels } = await import('./CompletionApi');
+    const models = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: '正在获取模型列表...' },
+      async () => {
+        try {
+          return await listModels(baseUrl, apiKey);
+        } catch (e: any) {
+          vscode.window.showErrorMessage(`获取模型列表失败: ${e.message}`);
+          return null;
+        }
+      }
+    );
+
+    if (!models || models.length === 0) return;
+
+    const current = cfg.get<string>('model', '');
+    const selected = await vscode.window.showQuickPick(models, {
+      placeHolder: '选择 AI 模型',
+      matchOnDescription: true,
+    });
+
+    if (selected) {
+      await cfg.update('model', selected, vscode.ConfigurationTarget.Global);
+      vscode.window.showInformationMessage(`模型已切换为: ${selected}`);
+      // Update sidebar header
+      if (this._view) {
+        this._view.webview.postMessage({ type: 'modelChanged', model: selected });
+      }
+    }
   }
 }
 

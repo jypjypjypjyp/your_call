@@ -1,126 +1,74 @@
 import { Suggestion } from './types';
 
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function cardHtml(s: Suggestion, index: number): string {
-  const colors = ['#4fc3f7', '#81c784', '#ffb74d'];
-  const color = colors[index % 3];
-  const diffLines = s.diff.split('\n').map(line => {
-    if (line.startsWith('+')) return `<div class="dl da"><span class="m">+</span><span class="c">${escapeHtml(line.slice(1))}</span></div>`;
-    if (line.startsWith('-')) return `<div class="dl dd"><span class="m">-</span><span class="c">${escapeHtml(line.slice(1))}</span></div>`;
-    if (line.startsWith('@@')) return `<div class="dl dh"><span class="m"> </span><span class="c">${escapeHtml(line)}</span></div>`;
-    return `<div class="dl"><span class="m"> </span><span class="c">${escapeHtml(line)}</span></div>`;
+const CC = ['#4fc3f7', '#81c784', '#ffb74d'];
+
+function card(s: Suggestion, i: number): string {
+  const d = s.diff.split('\n').map(l => {
+    const c = l.startsWith('+') ? 'da' : l.startsWith('-') ? 'dd' : l.startsWith('@@') ? 'dh' : '';
+    return `<div class="l${c ? ' ' + c : ''}"><span class="m">${c === 'da' ? '+' : c === 'dd' ? '-' : ' '}</span><span class="c">${esc(c === 'dh' ? l : l.replace(/^[+-]/, ''))}</span></div>`;
   }).join('');
-
-  return `
-  <div class="card" data-index="${index}">
-    <div class="ch">
-      <div class="ct" style="border-left:3px solid ${color}">
-        <span class="ci"></span>${escapeHtml(s.title)}
-      </div>
-      <button class="apply-btn" data-index="${index}">应用</button>
-    </div>
-    <div class="cd">${escapeHtml(s.description)}</div>
-    <div class="diff">${diffLines}</div>
-  </div>`;
+  return `<div class="cd" data-i="${i}"><div class="h"><div class="t" style="border-left:3px solid ${CC[i % 3]}">${esc(s.title)}</div><button class="b" data-i="${i}">应用</button></div><div class="de">${esc(s.description)}</div><div class="df">${d}</div></div>`;
 }
 
-export function getSidebarHtml(suggestions: Suggestion[], loading: boolean, error: string): string {
-  const cards = loading
-    ? '<div class="loading">正在分析代码...</div>'
-    : error
-      ? `<div class="error">${escapeHtml(error)}<br><span class="retry" id="retryBtn">重新尝试</span></div>`
-      : suggestions.map((s, i) => cardHtml(s, i)).join('\n');
+export function getSidebarHtml(su: Suggestion[], lo: boolean, er: string, mo = '', st = false): string {
+  const c = st
+    ? `<div class="sa"><div class="ss" id="srs" style="display:none"><div class="sl sg">思考过程</div><div class="sx" id="sr"></div></div><div class="ss"><div class="sl sb">生成内容</div><div class="sx" id="sc"></div></div><div class="sss" id="sss">正在生成...</div></div>`
+    : lo ? '<div class="ld">正在分析代码...</div>'
+    : er ? `<div class="er">${esc(er)}<br><span class="b rt" id="rt">重新尝试</span></div>`
+    : su.map((s, i) => card(s, i)).join('');
 
-  return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1e1e1e;color:#ccc;padding:8px;font-size:13px;}
-.card{background:#2d2d2d;border-radius:6px;margin-bottom:8px;overflow:hidden;cursor:pointer;transition:transform .1s,box-shadow .1s;}
-.card:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.4);}
-.ch{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 10px 2px;}
-.ct{font-weight:600;font-size:13px;padding-left:6px;flex:1;}
-.ci{display:inline-block;width:3px;height:14px;border-radius:2px;margin-right:6px;vertical-align:middle;}
-.cd{color:#888;font-size:12px;padding:2px 10px 6px;line-height:1.5;}
-.apply-btn{background:#0e639c;color:#fff;border:none;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer;}
-.apply-btn:hover{background:#1177bb;}
-.diff{margin:0 8px 8px;background:#1a1a1a;border-radius:4px;border:1px solid #333;font-family:Consolas,'Fira Code',monospace;font-size:11px;line-height:1.6;overflow-x:auto;}
-.dl{display:flex;}
-.dl .m{width:16px;text-align:center;flex-shrink:0;font-weight:bold;}
-.dl .c{flex:1;white-space:pre;padding-right:8px;}
-.da{background:#1a3a1a;}.da .m{color:#81c784;}.da .c{color:#a3d9a3;}
-.dd{background:#3a1a1a;}.dd .m{color:#f44747;}.dd .c{color:#f48787;}
-.dh{background:#252538;}.dh .m,.dh .c{color:#777;font-style:italic;}
-.input-area{display:flex;gap:6px;padding:4px 0;}
-.input-area input{flex:1;background:#3c3c3c;border:1px solid #555;border-radius:3px;padding:6px 8px;color:#ccc;font-size:12px;outline:none;}
-.input-area input:focus{border-color:#0e639c;}
-.input-area input::placeholder{color:#666;}
-.input-area button{background:#0e639c;color:#fff;border:none;border-radius:3px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;}
-.input-area button:hover{background:#1177bb;}
-.loading{text-align:center;padding:40px 20px;color:#888;}
-.error{text-align:center;padding:20px;color:#f48787;font-size:12px;}
-.error .retry{color:#4fc3f7;cursor:pointer;text-decoration:underline;margin-top:8px;display:inline-block;}
-.status{font-size:11px;color:#666;padding:4px 2px;border-top:1px solid #333;margin-top:4px;display:flex;justify-content:space-between;}
-.status .kbd{color:#888;}
-.header-info{font-size:11px;color:#666;padding:4px 2px 6px;border-bottom:1px solid #333;margin-bottom:6px;}
-</style>
-</head>
-<body>
-  <div id="app">
-    <div class="header-info" id="info"></div>
-    <div id="cards">${cards}</div>
-    <div class="input-area">
-      <input type="text" id="intentInput" placeholder="输入补充意图，如：移动端适配、性能优化..." />
-      <button id="regenerateBtn">重新生成</button>
-    </div>
-    <div class="status">
-      <span id="statusText"></span>
-      <span class="kbd">Ctrl+Shift+Space</span>
-    </div>
-  </div>
-
+  return `<!DOCTYPE html><html><head><style>
+body{font-family:var(--vscode-editor-font-family);font-size:var(--vscode-editor-font-size,13px);background:var(--vscode-sideBar-background);color:var(--vscode-sideBar-foreground);padding:8px;margin:0;display:flex;flex-direction:column;height:100vh}
+.cd{background:var(--vscode-sideBar-background);border:1px solid var(--vscode-sideBar-border);border-radius:4px;margin-bottom:8px;overflow:hidden;cursor:pointer}
+.cd:hover{box-shadow:0 0 0 1px var(--vscode-focusBorder)}
+.h{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 10px 2px}
+.cd .t{font-weight:600;padding-left:6px;flex:1}
+.de{color:var(--vscode-descriptionForeground);font-size:12px;padding:2px 10px 6px;line-height:1.5}
+.b{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:3px;padding:2px 8px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit}
+.b:hover{background:var(--vscode-button-hoverBackground)}
+.df{background:var(--vscode-editor-background);border:1px solid var(--vscode-sideBar-border);border-radius:3px;font-family:inherit;font-size:11px;line-height:1.6;margin:0 8px 8px;overflow-x:auto}
+.l{display:flex}
+.l .m{width:16px;text-align:center;flex-shrink:0;font-weight:700;color:var(--vscode-descriptionForeground)}
+.l .c{flex:1;white-space:pre;padding-right:8px}
+.da{background:rgba(0,200,80,.12)}.da .m{color:var(--vscode-terminal-ansiGreen)}.da .c{color:var(--vscode-terminal-ansiGreen)}
+.dd{background:rgba(200,0,0,.12)}.dd .m{color:var(--vscode-terminal-ansiRed)}.dd .c{color:var(--vscode-terminal-ansiRed)}
+.dh{background:var(--vscode-editor-background)}.dh .m,.dh .c{color:var(--vscode-descriptionForeground);font-style:italic}
+.ia{display:flex;gap:6px;padding:4px 0}
+.ia input{flex:1;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:3px;padding:6px 8px;color:var(--vscode-input-foreground);font-family:inherit;font-size:12px;outline:none}
+.ia input:focus{border-color:var(--vscode-focusBorder)}
+.ia input::placeholder{color:var(--vscode-input-placeholderForeground)}
+.ia .b{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:3px;padding:6px 12px;font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.sx{font-family:inherit;font-size:11px;line-height:1.6;padding:8px;background:var(--vscode-editor-background);border-radius:3px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto}
+.sl{font-size:11px;font-weight:600;padding:4px 8px;border-radius:3px;margin-bottom:4px}
+.sg{background:var(--vscode-editor-background);color:var(--vscode-terminal-ansiGreen)}
+.sb{background:var(--vscode-editor-background);color:var(--vscode-focusBorder)}
+.sss{font-size:11px;color:var(--vscode-descriptionForeground);padding:4px 8px;text-align:center}
+.ld{text-align:center;padding:40px 20px;color:var(--vscode-descriptionForeground)}
+.er{text-align:center;padding:20px;color:var(--vscode-descriptionForeground);font-size:12px}
+.rt{display:inline-block;margin-top:8px}
+.hi{font-size:11px;color:var(--vscode-descriptionForeground);padding:4px 2px 6px;border-bottom:1px solid var(--vscode-sideBar-border);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.ms{cursor:pointer;font-size:11px}.ms:hover{background:var(--vscode-list-hoverBackground)}
+.sts{font-size:11px;color:var(--vscode-descriptionForeground);padding:4px 2px;border-top:1px solid var(--vscode-sideBar-border);margin-top:4px}
+#c{flex:1;overflow-y:auto;min-height:0}
+</style></head><body>
+<div class="hi">${mo ? `<span class="ms" id="ms">模型: ${esc(mo)} ▾</span>` : ''}</div>
+<div id="c">${c}</div>
+<div class="ia"><input id="ii" placeholder="输入意图（可选）"/><button class="b" id="gb">生成建议</button></div>
+<div class="sts" id="st"></div>
 <script>
-(function() {
-  const vscode = acquireVsCodeApi();
-  let suggestions = ${JSON.stringify(suggestions)};
-
-  document.getElementById('cards').addEventListener('click', e => {
-    const card = e.target.closest('.card');
-    if (!card) return;
-    const idx = parseInt(card.dataset.index);
-    if (e.target.classList.contains('apply-btn')) {
-      vscode.postMessage({ type: 'applySuggestion', suggestion: suggestions[idx] });
-    } else {
-      vscode.postMessage({ type: 'viewDiff', suggestion: suggestions[idx] });
-    }
-  });
-
-  document.getElementById('regenerateBtn').addEventListener('click', () => {
-    const input = document.getElementById('intentInput');
-    vscode.postMessage({ type: 'regenerate', userIntent: input.value });
-  });
-
-  document.getElementById('intentInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      document.getElementById('regenerateBtn').click();
-    }
-  });
-
-  const retryBtn = document.getElementById('retryBtn');
-  if (retryBtn) {
-    retryBtn.addEventListener('click', () => {
-      const input = document.getElementById('intentInput');
-      vscode.postMessage({ type: 'regenerate', userIntent: input.value });
-    });
-  }
-
-  vscode.postMessage({ type: 'ready' });
-})();
-</script>
-</body>
-</html>`;
+(function(){const v=acquireVsCodeApi();let su=${JSON.stringify(su)};
+document.getElementById('c').addEventListener('click',e=>{const c=e.target.closest('.cd');if(!c)return;const i=parseInt(c.dataset.i);e.target.classList.contains('b')?v.postMessage({type:'applySuggestion',suggestion:su[i]}):v.postMessage({type:'viewDiff',suggestion:su[i]})});
+document.getElementById('gb').addEventListener('click',()=>{v.postMessage({type:'regenerate',userIntent:document.getElementById('ii').value})});
+document.getElementById('ii').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('gb').click()});
+const rt=document.getElementById('rt');if(rt)rt.addEventListener('click',()=>{v.postMessage({type:'regenerate',userIntent:document.getElementById('ii').value})});
+const ms=document.getElementById('ms');if(ms)ms.addEventListener('click',()=>{v.postMessage({type:'selectModel'})});
+window.addEventListener('message',e=>{const m=e.data;
+if(m.type==='modelChanged'&&m.model){const el=document.getElementById('ms');if(el)el.textContent='模型: '+m.model+' ▾'}
+if(m.type==='streamChunk'){const rs=document.getElementById('srs'),re=document.getElementById('sr'),ce=document.getElementById('sc');if(m.reasoning&&rs){rs.style.display='';if(re)re.textContent=m.reasoning}if(ce){ce.textContent=m.content;ce.scrollTop=ce.scrollHeight}}
+if(m.type==='streamEnd'){const se=document.getElementById('sss');if(se)se.textContent='生成完成，正在解析...'}})})()
+</script></body></html>`;
 }
