@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { spawn, IPty } from 'node-pty';
+import type { IPty } from 'node-pty';
 import * as fs from 'fs';
 import * as path from 'path';
 
 export class AgentProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'aiCompletion.agent';
+  public static readonly viewType = 'yourcall.agent';
   private _view?: vscode.WebviewView;
   private _pty: IPty | null = null;
 
@@ -12,11 +12,11 @@ export class AgentProvider implements vscode.WebviewViewProvider {
 
   resolveWebviewView(vw: vscode.WebviewView): void {
     this._view = vw;
-    vw.webview.options = { enableScripts: true, localResourceRoots: [this._uri], retainContextWhenHidden: true };
+    vw.webview.options = { enableScripts: true, localResourceRoots: [this._uri] };
     vw.webview.html = this._buildHtml();
     vw.onDidDispose(() => this._kill());
     vw.webview.onDidReceiveMessage(m => {
-      if (m.type === 'start') this._start();
+      if (m.type === 'start') this._start(m.cmd as string | undefined);
       else if (m.type === 'stop') this._kill();
       else if (m.type === 'data' && this._pty) this._pty.write(m.text);
       else if (m.type === 'resize' && this._pty) this._pty.resize(m.cols, m.rows);
@@ -25,6 +25,7 @@ export class AgentProvider implements vscode.WebviewViewProvider {
 
   private _buildHtml(): string {
     const extPath = this._uri.fsPath;
+    const defaultCmd = (vscode.workspace.getConfiguration('yourcall').get<string>('agentCommand', '') || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     let xtermJs = '';
     let xtermCss = '';
     let fitAddonJs = '';
@@ -39,11 +40,13 @@ body{margin:0;padding:0;background:var(--vscode-terminal-background);height:100v
 #terminal{flex:1;width:100%;min-height:0}
 .tb{display:flex;gap:4px;padding:4px 8px;background:var(--vscode-sideBarSectionHeader-background);border-bottom:1px solid var(--vscode-sideBar-border);align-items:center}
 .tb .h{flex:1;font-size:11px;color:var(--vscode-descriptionForeground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+.ci{flex:1;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);border-radius:3px;padding:2px 6px;font-size:11px;font-family:inherit;outline:none;min-width:0}
+.ci:focus{border-color:var(--vscode-focusBorder)}
 .b{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:3px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit}
 .b:hover{background:var(--vscode-button-hoverBackground)}
 .bd{background:var(--vscode-errorForeground)}.bd:hover{filter:brightness(1.2)}
 </style></head><body>
-<div class="tb"><button class="b" id="sb">▶ ${esc(vscode.l10n.t('Start'))}</button><button class="b bd" id="sp" style="display:none">■ ${esc(vscode.l10n.t('Stop'))}</button><span class="h" id="ch"></span></div>
+<div class="tb"><button class="b" id="sb">▶ ${esc(vscode.l10n.t('Start'))}</button><button class="b bd" id="sp" style="display:none">■ ${esc(vscode.l10n.t('Stop'))}</button><input class="ci" id="ch" type="text" placeholder="${esc(vscode.l10n.t('agent command'))}" value="${defaultCmd}"></div>
 <div id="terminal"></div>
 <script>${xtermJs}
 ${fitAddonJs}
@@ -71,28 +74,37 @@ if(m.type==='s'){document.getElementById('sb').style.display='none';document.get
 if(m.type==='x'){document.getElementById('sb').style.display='';document.getElementById('sp').style.display='none'}
 if(m.type==='o'){term.write(m.t)}
 if(m.type==='e')term.write('\\r\\n${esc(vscode.l10n.t('Error: {msg}', { msg: '' }))}'+m.t+'\\r\\n').then(()=>{document.getElementById('sb').style.display='';document.getElementById('sp').style.display='none'})
-if(m.type==='c'){document.getElementById('ch').textContent=m.t}});
-document.getElementById('sb').addEventListener('click',()=>v.postMessage({type:'start'}));
+if(m.type==='c'){document.getElementById('ch').value=m.t}});
+document.getElementById('sb').addEventListener('click',()=>v.postMessage({type:'start',cmd:document.getElementById('ch').value}));
 document.getElementById('sp').addEventListener('click',()=>v.postMessage({type:'stop'}));
 }catch(e){const el=document.getElementById('terminal');if(el)el.textContent='${esc(vscode.l10n.t('Init failed: {msg}', { msg: '' }))}'+e.message}})()</script></body></html>`;
   }
 
-  private _start(): void {
-    const raw = (vscode.workspace.getConfiguration('aiCompletion').get<string>('agentCommand', '') || '').trim();
+  private _start(cmdOverride?: string): void {
+    const raw = (cmdOverride || vscode.workspace.getConfiguration('yourcall').get<string>('agentCommand', '') || '').trim();
     if (!raw) {
-      vscode.window.showErrorMessage(vscode.l10n.t('Configure aiCompletion.agentCommand in settings'));
+      vscode.window.showErrorMessage(vscode.l10n.t('Configure yourcall.agentCommand in settings'));
       return;
     }
 
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
     const isWin = process.platform === 'win32';
-    const shellCmd = isWin ? 'cmd.exe' : 'sh';
-    const shellArgs = isWin ? ['/c', `chcp 65001 > NUL & ${raw}`] : ['-c', raw];
+    const shellCmd = isWin ? 'cmd.exe' : 'bash';
+    const shellArgs = isWin ? ['/c', `chcp 65001 > NUL & ${raw}`] : ['-l', '-i', '-c', raw];
 
     this._view?.webview.postMessage({ type: 'c', t: raw });
 
+    let pty: typeof import('node-pty');
     try {
-      this._pty = spawn(shellCmd, shellArgs, {
+      pty = require('node-pty');
+    } catch {
+      this._view?.webview.postMessage({ type: 'o', t: `\r\n${esc(vscode.l10n.t('node-pty not installed. Restart VS Code after install completes.'))}\r\n` });
+      this._view?.webview.postMessage({ type: 'e', t: 'node-pty not found' });
+      return;
+    }
+
+    try {
+      this._pty = pty.spawn(shellCmd, shellArgs, {
         name: 'xterm-256color',
         cols: 80,
         rows: 24,

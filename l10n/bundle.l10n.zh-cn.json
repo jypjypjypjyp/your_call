@@ -38,7 +38,7 @@
   "Start failed: {msg}": "启动失败: {msg}",
   "Generation complete": "生成完成，正在解析...",
   "Start Agent": "启动 Agent",
-  "Configure aiCompletion.agentCommand in settings": "请在设置 aiCompletion.agentCommand 中配置命令",
+  "Configure yourcall.agentCommand in settings": "请在设置 yourcall.agentCommand 中配置命令",
   "Error: {msg}": "错误: {msg}",
   "Agent CLI start failed: {msg}": "Agent CLI 启动失败: {msg}",
   "Suggestion {i}": "方案 {i}",

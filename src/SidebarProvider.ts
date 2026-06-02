@@ -5,12 +5,12 @@ import { collectContext } from './ContextCollector';
 import { fetchSuggestions, streamSuggestions } from './CompletionApi';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'aiCompletion.sidebar';
+  public static readonly viewType = 'yourcall.sidebar';
   private _view?: vscode.WebviewView;
   private _abortController: AbortController | null = null;
 
   private get currentModel(): string {
-    return vscode.workspace.getConfiguration('aiCompletion').get<string>('model', '');
+    return vscode.workspace.getConfiguration('yourcall').get<string>('model', '');
   }
   constructor(
     private readonly _secretStorage: vscode.SecretStorage,
@@ -46,15 +46,19 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         case 'resetSuggestion':
           this.autoComplete(`优化方案：${msg.suggestion.title} - ${msg.suggestion.description}\n\n原方案的修改内容：\n${msg.suggestion.diff}\n\n请保持修改意图不变，优化实现方式。`);
           break;
-        case 'stop':
+        case 'stop': {
           if (this._abortController) {
             this._abortController.abort();
             this._abortController = null;
           }
-          this._view?.webview.postMessage({ type: 'streamEnd' });
-          this._view.webview.html = getSidebarHtml([], false, vscode.l10n.t('Enter intent or click Generate'), this.currentModel);
-          this._view.title = vscode.l10n.t('AI Code Completion');
+          const view = this._view;
+          if (view) {
+            view.webview.postMessage({ type: 'streamEnd' });
+            view.webview.html = getSidebarHtml([], false, vscode.l10n.t('Enter intent or click Generate'), this.currentModel);
+            view.title = vscode.l10n.t('AI Code Completion');
+          }
           break;
+        }
       }
     });
 
@@ -76,7 +80,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      const apiKey = (await this._secretStorage.get('aiCompletion.apiKey')) ?? '';
+      const apiKey = (await this._secretStorage.get('yourcall.apiKey')) ?? '';
       if (!apiKey) {
         this._view.webview.html = getSidebarHtml([], false, vscode.l10n.t('Configure API Key in settings first'), this.currentModel);
         this._view.title = vscode.l10n.t('AI Code Completion');
@@ -144,9 +148,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private async selectModel(): Promise<void> {
-    const cfg = vscode.workspace.getConfiguration('aiCompletion');
+    const cfg = vscode.workspace.getConfiguration('yourcall');
     const baseUrl = cfg.get<string>('apiBaseUrl', 'https://api.openai.com/v1');
-    const apiKey = await this._secretStorage.get('aiCompletion.apiKey');
+    const apiKey = await this._secretStorage.get('yourcall.apiKey');
     if (!apiKey) {
       vscode.window.showErrorMessage(vscode.l10n.t('Configure AI API Key first'));
       return;

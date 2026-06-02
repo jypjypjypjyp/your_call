@@ -11,25 +11,19 @@
     "Other"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [
-    "onCommand:aiCompletion.openSidebar",
-    "onView:aiCompletion.sidebar",
-    "onView:aiCompletion.agent",
-    "onCommand:aiCompletion.configureApiKey",
-    "onCommand:aiCompletion.selectModel"
-  ],
+  "activationEvents": [],
   "contributes": {
     "commands": [
       {
-        "command": "aiCompletion.openSidebar",
+        "command": "yourcall.openSidebar",
         "title": "%cmd.openSidebar.title%"
       },
       {
-        "command": "aiCompletion.configureApiKey",
+        "command": "yourcall.configureApiKey",
         "title": "%cmd.configureApiKey.title%"
       },
       {
-        "command": "aiCompletion.selectModel",
+        "command": "yourcall.selectModel",
         "title": "%cmd.selectModel.title%"
       },
       {
@@ -39,6 +33,10 @@
       {
         "command": "yourcall.copyFilePath",
         "title": "%cmd.copyFilePath.title%"
+      },
+      {
+        "command": "yourcall.installNodePty",
+        "title": "%cmd.installNodePty.title%"
       }
     ],
     "menus": {
@@ -64,62 +62,62 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "ai-completion",
-          "title": "AI Completion",
+          "id": "yourcall",
+          "title": "Your Call",
           "icon": "media/activity-bar.svg"
         }
       ]
     },
     "views": {
-      "ai-completion": [
+      "yourcall": [
         {
           "type": "webview",
-          "id": "aiCompletion.sidebar",
-          "name": "AI Completion",
+          "id": "yourcall.sidebar",
+          "name": "Your Call",
           "icon": "$(lightbulb)"
         },
         {
           "type": "webview",
-          "id": "aiCompletion.agent",
+          "id": "yourcall.agent",
           "name": "Agent CLI",
           "icon": "$(terminal)"
         }
       ]
     },
     "configuration": {
-      "title": "AI Completion",
+      "title": "Your Call",
       "properties": {
-        "aiCompletion.apiBaseUrl": {
+        "yourcall.apiBaseUrl": {
           "type": "string",
           "default": "https://api.openai.com/v1",
           "description": "Base URL for the API endpoint"
         },
-        "aiCompletion.model": {
+        "yourcall.model": {
           "type": "string",
           "default": "gpt-4o",
           "description": "Model name to use for completions"
         },
-        "aiCompletion.agentCommand": {
+        "yourcall.agentCommand": {
           "type": "string",
           "default": "",
           "description": "Agent CLI 命令，如 claude, opencode, aider。留空则在侧边栏选择"
         },
-        "aiCompletion.maxFileLines": {
+        "yourcall.maxFileLines": {
           "type": "number",
           "default": 500,
           "description": "Maximum number of lines to include from a file"
         },
-        "aiCompletion.maxOpenFiles": {
+        "yourcall.maxOpenFiles": {
           "type": "number",
           "default": 10,
           "description": "Maximum number of open files to consider for context"
         },
-        "aiCompletion.suggestionCount": {
+        "yourcall.suggestionCount": {
           "type": "number",
           "default": 3,
           "description": "Number of suggestions to generate"
         },
-        "aiCompletion.enableReasoning": {
+        "yourcall.enableReasoning": {
           "type": "boolean",
           "default": true,
           "description": "Enable AI model deep reasoning (reasoning_effort). Disable for faster responses on simple tasks"

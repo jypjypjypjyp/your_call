@@ -1,8 +1,29 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import { SidebarProvider } from './SidebarProvider';
 import { AgentProvider } from './AgentProvider';
 import { listModels } from './CompletionApi';
+
+
+function ensureNodePty(context: vscode.ExtensionContext, force = false): void {
+  const nodePtyDir = path.join(context.extensionUri.fsPath, 'node_modules', 'node-pty');
+  if (!force && fs.existsSync(nodePtyDir)) return;
+
+  const extDir = context.extensionUri.fsPath;
+  const isWin = process.platform === 'win32';
+  const terminal = vscode.window.createTerminal({
+    name: 'YourCall: Install node-pty',
+  });
+
+  if (isWin) {
+    terminal.sendText(`cd /d "${extDir.replace(/"/g, '\\"')}" && npm install node-pty`, true);
+  } else {
+    const escaped = extDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+    terminal.sendText(`cd "${escaped}" && npm install node-pty`, true);
+  }
+  terminal.show();
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   // Register sidebar provider
@@ -23,14 +44,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register open sidebar command (Ctrl+Shift+Space)
   // Register open sidebar command
-  const openSidebarCmd = vscode.commands.registerCommand('aiCompletion.openSidebar', () => {
-    vscode.commands.executeCommand('workbench.view.extension.ai-completion')
+  const openSidebarCmd = vscode.commands.registerCommand('yourcall.openSidebar', () => {
+    vscode.commands.executeCommand('workbench.view.extension.yourcall')
       .then(undefined, () => { /* ignore */ });
   });
   context.subscriptions.push(openSidebarCmd);
 
   // Register configure API Key command
-  const configureApiKeyCmd = vscode.commands.registerCommand('aiCompletion.configureApiKey', async () => {
+  const configureApiKeyCmd = vscode.commands.registerCommand('yourcall.configureApiKey', async () => {
     const key = await vscode.window.showInputBox({
       prompt: vscode.l10n.t('Enter OpenAI API Key'),
       password: true,
@@ -38,17 +59,17 @@ export function activate(context: vscode.ExtensionContext): void {
       ignoreFocusOut: true,
     });
     if (key) {
-      await context.secrets.store('aiCompletion.apiKey', key);
+      await context.secrets.store('yourcall.apiKey', key);
       vscode.window.showInformationMessage(vscode.l10n.t('API Key saved'));
     }
   });
   context.subscriptions.push(configureApiKeyCmd);
 
   // Register select model command
-  const selectModelCmd = vscode.commands.registerCommand('aiCompletion.selectModel', async () => {
-    const cfg = vscode.workspace.getConfiguration('aiCompletion');
+  const selectModelCmd = vscode.commands.registerCommand('yourcall.selectModel', async () => {
+    const cfg = vscode.workspace.getConfiguration('yourcall');
     const baseUrl = cfg.get<string>('apiBaseUrl', 'https://api.openai.com/v1');
-    const apiKey = await context.secrets.get('aiCompletion.apiKey');
+    const apiKey = await context.secrets.get('yourcall.apiKey');
     if (!apiKey) {
       vscode.window.showErrorMessage(vscode.l10n.t('Configure AI API Key first'));
       return;
@@ -125,15 +146,24 @@ export function activate(context: vscode.ExtensionContext): void {
     await vscode.env.clipboard.writeText(filePaths.join('; '));
     vscode.window.showInformationMessage(vscode.l10n.t('Copied {count} file paths', { count: filePaths.length }));
   });
+
+  // Register install node-pty command
+  const installCmd = vscode.commands.registerCommand('yourcall.installNodePty', () => {
+    ensureNodePty(context, true);
+  });
+  context.subscriptions.push(installCmd);
   context.subscriptions.push(copyPathCmd);
 
   // Migrate API Key from settings.json to SecretStorage (if present)
-  const apiKeyConfig = vscode.workspace.getConfiguration('aiCompletion').get<string>('apiKey');
+  const apiKeyConfig = vscode.workspace.getConfiguration('yourcall').get<string>('apiKey');
   if (apiKeyConfig) {
-    context.secrets.store('aiCompletion.apiKey', apiKeyConfig).then(() => {
-      vscode.workspace.getConfiguration('aiCompletion').update('apiKey', undefined, vscode.ConfigurationTarget.Global);
+    context.secrets.store('yourcall.apiKey', apiKeyConfig).then(() => {
+      vscode.workspace.getConfiguration('yourcall').update('apiKey', undefined, vscode.ConfigurationTarget.Global);
     });
   }
+
+  // Auto-install node-pty (native module excluded from .vsix)
+  ensureNodePty(context);
 }
 
 export function deactivate(): void {

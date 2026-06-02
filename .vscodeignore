@@ -8,8 +8,3 @@ esbuild.js
 node_modules/
 !node_modules/@xterm/xterm/lib/xterm.js
 !node_modules/@xterm/xterm/css/xterm.css
-!node_modules/node-pty/**
-!node_modules/node-addon-api/**
-node_modules/node-pty/prebuilds/win32-arm64/
-node_modules/node-pty/deps/
-node_modules/node-pty/src/

@@ -21,6 +21,7 @@ export type WebViewMessage =
   | { type: 'resetSuggestion'; suggestion: Suggestion }
   | { type: 'regenerate'; userIntent: string }
   | { type: 'viewDiff'; suggestion: Suggestion }
+  | { type: 'stop' }
   | { type: 'selectModel' };
 
 export type ExtensionMessage =

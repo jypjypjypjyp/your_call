@@ -109,7 +109,7 @@ export async function fetchSuggestions(
     throw new Error(vscode.l10n.t('API Key not configured'));
   }
 
-  const config = vscode.workspace.getConfiguration('aiCompletion');
+  const config = vscode.workspace.getConfiguration('yourcall');
   const apiBaseUrl = config.get<string>('apiBaseUrl', 'https://api.openai.com/v1');
   const model = config.get<string>('model', 'gpt-4o-mini');
   const suggestionCount = config.get<number>('suggestionCount', 3);
@@ -195,7 +195,7 @@ export async function streamSuggestions(
 ): Promise<Suggestion[]> {
   if (!apiKey) throw new Error('API Key 未配置');
 
-  const config = vscode.workspace.getConfiguration('aiCompletion');
+  const config = vscode.workspace.getConfiguration('yourcall');
   const apiBaseUrl = config.get<string>('apiBaseUrl', 'https://api.openai.com/v1');
   const model = config.get<string>('model', 'gpt-4o-mini');
   const suggestionCount = config.get<number>('suggestionCount', 3);

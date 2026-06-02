@@ -17,8 +17,8 @@ YourCall 不做另一套 AI 功能——它只做两件事：
 ### ① 你的 Agent CLI 终端
 配置你每天在用的 CLI 命令，侧边栏内直接运行。
 
-- 你习惯 `claude`？→ 配置 `aiCompletion.agentCommand: "claude"`
-- 你用 `opencode`？→ 配置 `aiCompletion.agentCommand: "opencode"`
+- 你习惯 `claude`？→ 配置 `yourcall.agentCommand: "claude"`
+- 你用 `opencode`？→ 配置 `yourcall.agentCommand: "opencode"`
 - 你用 `omp --resume`？→ 配就是了
 
 VS Code 底部面板的终端归终端，YourCall 的侧边栏终端归你。
@@ -40,7 +40,7 @@ code --install-extension yourcall-0.1.0.vsix
 
 ```bash
 # 1. 配置你的 Agent CLI
-# 设置 → aiCompletion.agentCommand → "claude"
+# 设置 → yourcall.agentCommand → "claude"
 
 # 2. 打开侧边栏 → Agent CLI 标签 → 启动
 ```
@@ -49,10 +49,10 @@ code --install-extension yourcall-0.1.0.vsix
 
 | 设置 | 默认值 | 说明 |
 |------|--------|------|
-| `aiCompletion.agentCommand` | `""` | 你的 Agent CLI 命令 |
-| `aiCompletion.apiBaseUrl` | `https://api.openai.com/v1` | API 地址（AI 补全用） |
-| `aiCompletion.model` | `gpt-4o` | 模型名 |
-| `aiCompletion.suggestionCount` | `3` | 补全方案数 |
+| `yourcall.agentCommand` | `""` | 你的 Agent CLI 命令 |
+| `yourcall.apiBaseUrl` | `https://api.openai.com/v1` | API 地址（AI 补全用） |
+| `yourcall.model` | `gpt-4o` | 模型名 |
+| `yourcall.suggestionCount` | `3` | 补全方案数 |
 
 ## 命令
 

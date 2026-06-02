@@ -38,7 +38,7 @@
   "Start failed: {msg}": "Start failed: {msg}",
   "Generation complete": "Generation complete",
   "Start Agent": "Start Agent",
-  "Configure aiCompletion.agentCommand in settings": "Configure aiCompletion.agentCommand in settings",
+  "Configure yourcall.agentCommand in settings": "Configure yourcall.agentCommand in settings",
   "Error: {msg}": "Error: {msg}",
   "Agent CLI start failed: {msg}": "Agent CLI start failed: {msg}",
   "Suggestion {i}": "Suggestion {i}",
@@ -54,5 +54,7 @@
   "API returned empty array": "API returned empty array",
   "API returned empty": "API returned empty",
   "Response body not readable": "Response body not readable",
-  "Open diff failed: {msg}": "Open diff failed: {msg}"
+  "Open diff failed: {msg}": "Open diff failed: {msg}",
+  "node-pty not installed. Restart VS Code after install completes.": "node-pty not installed. Restart VS Code after install completes."
+  "agent command": "agent command",
 }

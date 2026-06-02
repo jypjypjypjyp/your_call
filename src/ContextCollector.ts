@@ -3,7 +3,7 @@ import { ContextDocument } from './types';
 
 
 export function collectContext(): { documents: ContextDocument[]; cursorFile: string; cursorLine: number; selectionStart: number; selectionEnd: number } {
-  const config = vscode.workspace.getConfiguration('aiCompletion');
+  const config = vscode.workspace.getConfiguration('yourcall');
   const maxLines = config.get<number>('maxFileLines', 500);
   const maxFiles = config.get<number>('maxOpenFiles', 10);
 
@@ -31,10 +31,10 @@ export function collectContext(): { documents: ContextDocument[]; cursorFile: st
 
 
       const content = doc.getText();
-      const lines = content.split('\n');
+      const lines = content.split(/\r?\n/);
       const truncated = lines.length > maxLines
         ? lines.slice(0, maxLines).join('\n') + '\n// ... [截断]'
-        : content;
+        : content.replace(/\r\n/g, '\n');
 
       // Extract selection/cursor range code for active file
       let nearCursorCode = '';
