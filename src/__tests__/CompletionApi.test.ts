@@ -8,6 +8,12 @@ vi.mock('vscode', () => ({
       get: <T>(_key: string, defaultValue?: T): T | undefined => defaultValue,
     }),
   },
+  l10n: {
+    t: (message: string, args?: Record<string, unknown>): string => {
+      if (!args) return message;
+      return message.replace(/\{(\w+)\}/g, (_, k) => String(args[k] ?? ''));
+    },
+  },
 }));
 
 describe('parseResponse', () => {
@@ -29,16 +35,16 @@ describe('parseResponse', () => {
   it('缺少字段时使用默认值', () => {
     const input = '[{"diff": "+x"}]';
     const result = parseResponse(input);
-    expect(result[0].title).toBe('方案 1');
+    expect(result[0].title).toBe('Suggestion 1');
     expect(result[0].description).toBe('');
   });
 
   it('空数组抛异常', () => {
-    expect(() => parseResponse('[]')).toThrow('空数组');
+    expect(() => parseResponse('[]')).toThrow('API returned empty array');
   });
 
   it('无 JSON 数组抛异常', () => {
-    expect(() => parseResponse('没有数组')).toThrow('未找到 JSON 数组');
+    expect(() => parseResponse('没有数组')).toThrow('No JSON array in response');
   });
 });
 

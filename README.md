@@ -1,6 +1,6 @@
 # YourCall
 
-**极简 Coding Agent VS Code 扩展。不为改变你的习惯，只为你的 CLI Agent 提供侧边栏。**
+**极简 Coding Agent VS Code 扩展。不为改变你的习惯，只为服务你的 Agent CLI。**
 
 ---
 

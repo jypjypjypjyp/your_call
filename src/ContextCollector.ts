@@ -1,13 +1,6 @@
 import * as vscode from 'vscode';
 import { ContextDocument } from './types';
 
-// Only collect code language files
-const CODE_LANGUAGES: Record<string, true> = {
-  typescript: true, javascript: true, python: true, rust: true, go: true, java: true,
-  cpp: true, c: true, csharp: true, php: true, ruby: true, swift: true, kotlin: true,
-  scala: true, dart: true, lua: true, perl: true, r: true, haskell: true, clojure: true,
-  elixir: true, erlang: true, zig: true, nim: true,
-};
 
 export function collectContext(): { documents: ContextDocument[]; cursorFile: string; cursorLine: number; selectionStart: number; selectionEnd: number } {
   const config = vscode.workspace.getConfiguration('aiCompletion');
@@ -36,8 +29,6 @@ export function collectContext(): { documents: ContextDocument[]; cursorFile: st
       const doc = vscode.workspace.textDocuments.find(d => d.uri.fsPath === input.uri.fsPath);
       if (!doc) continue;
 
-      const langId = doc.languageId;
-      if (!CODE_LANGUAGES[langId]) continue;
 
       const content = doc.getText();
       const lines = content.split('\n');
@@ -55,7 +46,7 @@ export function collectContext(): { documents: ContextDocument[]; cursorFile: st
 
       documents.push({
         fileName: doc.uri.fsPath,
-        languageId: langId,
+        languageId: doc.languageId,
         content: truncated,
         isActive: doc.uri.fsPath === activeFileName,
         cursorLine: doc.uri.fsPath === activeFileName ? cursorLine : -1,

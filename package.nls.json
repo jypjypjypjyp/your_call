@@ -1,0 +1,8 @@
+{
+  "cmd.openSidebar.title": "Open AI Completion Sidebar",
+  "cmd.configureApiKey.title": "Configure AI Completion API Key",
+  "cmd.selectModel.title": "AI Completion: Select Model",
+  "cmd.copyCode.title": "Copy Code Location to AI",
+  "extension.description": "Minimalist coding agent VS Code extension. Not to change your habits, just to serve your Agent CLI.",
+  "cmd.copyFilePath.title": "Copy File Path to AI"
+}

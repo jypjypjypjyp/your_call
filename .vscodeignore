@@ -10,8 +10,6 @@ node_modules/
 !node_modules/@xterm/xterm/css/xterm.css
 !node_modules/node-pty/**
 !node_modules/node-addon-api/**
-node_modules/node-pty/prebuilds/darwin-*
-node_modules/node-pty/prebuilds/linux-*
 node_modules/node-pty/prebuilds/win32-arm64/
 node_modules/node-pty/deps/
 node_modules/node-pty/src/

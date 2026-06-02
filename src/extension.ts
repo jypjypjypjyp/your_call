@@ -16,7 +16,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register Agent CLI provider
   const agentProvider = new AgentProvider(context.extensionUri);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(AgentProvider.viewType, agentProvider)
+    vscode.window.registerWebviewViewProvider(AgentProvider.viewType, agentProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    })
   );
 
   // Register open sidebar command (Ctrl+Shift+Space)
@@ -30,14 +32,14 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register configure API Key command
   const configureApiKeyCmd = vscode.commands.registerCommand('aiCompletion.configureApiKey', async () => {
     const key = await vscode.window.showInputBox({
-      prompt: '请输入 OpenAI 兼容 API Key',
+      prompt: vscode.l10n.t('Enter OpenAI API Key'),
       password: true,
       placeHolder: 'sk-...',
       ignoreFocusOut: true,
     });
     if (key) {
       await context.secrets.store('aiCompletion.apiKey', key);
-      vscode.window.showInformationMessage('API Key 已保存');
+      vscode.window.showInformationMessage(vscode.l10n.t('API Key saved'));
     }
   });
   context.subscriptions.push(configureApiKeyCmd);
@@ -48,19 +50,19 @@ export function activate(context: vscode.ExtensionContext): void {
     const baseUrl = cfg.get<string>('apiBaseUrl', 'https://api.openai.com/v1');
     const apiKey = await context.secrets.get('aiCompletion.apiKey');
     if (!apiKey) {
-      vscode.window.showErrorMessage('请先配置 API Key');
+      vscode.window.showErrorMessage(vscode.l10n.t('Configure AI API Key first'));
       return;
     }
 
     // Fetch models with loading indicator
     const models = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: '正在获取模型列表...' },
+      { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Fetching model list...') },
       async () => {
         try {
           return await listModels(baseUrl, apiKey);
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
-          vscode.window.showErrorMessage(`获取模型列表失败: ${msg}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('Failed to fetch model list: {msg}', { msg }));
           return null;
         }
       }
@@ -70,14 +72,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const current = cfg.get<string>('model', '');
     const selected = await vscode.window.showQuickPick(models, {
-      placeHolder: '选择 AI 模型',
+      placeHolder: vscode.l10n.t('Select AI model'),
       matchOnDescription: true,
       canPickMany: false,
     });
 
     if (selected) {
       await cfg.update('model', selected, vscode.ConfigurationTarget.Global);
-      vscode.window.showInformationMessage(`模型已切换为: ${selected}`);
+      vscode.window.showInformationMessage(vscode.l10n.t('Model switched to: {model}', { model: selected }));
     }
   });
   context.subscriptions.push(selectModelCmd);
@@ -86,12 +88,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const copyCodeCmd = vscode.commands.registerCommand('yourcall.copyCode', async () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      vscode.window.showWarningMessage('没有活动的编辑器');
+      vscode.window.showWarningMessage(vscode.l10n.t('No active editor'));
       return;
     }
     const selection = editor.selection;
     if (selection.isEmpty) {
-      vscode.window.showWarningMessage('请先选择代码');
+      vscode.window.showWarningMessage(vscode.l10n.t('Select code first'));
       return;
     }
     const document = editor.document;
@@ -100,7 +102,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const startLine = selection.start.line + 1;
     const endLine = selection.end.line + 1;
     await vscode.env.clipboard.writeText(`${filePath}:${startLine}-${endLine}`);
-    vscode.window.showInformationMessage(`已复制: ${filePath}:${startLine}-${endLine}`);
+    vscode.window.showInformationMessage(vscode.l10n.t('Copied: {filePath}:{startLine}-{endLine}', { filePath, startLine, endLine }));
   });
   context.subscriptions.push(copyCodeCmd);
 
@@ -121,7 +123,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }
     await vscode.env.clipboard.writeText(filePaths.join('; '));
-    vscode.window.showInformationMessage(`已复制 ${filePaths.length} 个文件路径`);
+    vscode.window.showInformationMessage(vscode.l10n.t('Copied {count} file paths', { count: filePaths.length }));
   });
   context.subscriptions.push(copyPathCmd);
 

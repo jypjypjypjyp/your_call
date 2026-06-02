@@ -7,11 +7,11 @@ import { fetchSuggestions, streamSuggestions } from './CompletionApi';
 export class SidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'aiCompletion.sidebar';
   private _view?: vscode.WebviewView;
+  private _abortController: AbortController | null = null;
 
   private get currentModel(): string {
     return vscode.workspace.getConfiguration('aiCompletion').get<string>('model', '');
   }
-
   constructor(
     private readonly _secretStorage: vscode.SecretStorage,
     private readonly _extensionUri: vscode.Uri
@@ -27,7 +27,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this._extensionUri],
     };
-    webviewView.webview.html = getSidebarHtml([], false, '输入意图（可选），点击"生成建议"', this.currentModel);
+    webviewView.webview.html = getSidebarHtml([], false, vscode.l10n.t('Enter intent or click Generate'), this.currentModel);
 
     webviewView.webview.onDidReceiveMessage(async (msg: WebViewMessage) => {
       switch (msg.type) {
@@ -42,6 +42,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           break;
         case 'selectModel':
           await this.selectModel();
+          break;
+        case 'resetSuggestion':
+          this.autoComplete(`优化方案：${msg.suggestion.title} - ${msg.suggestion.description}\n\n原方案的修改内容：\n${msg.suggestion.diff}\n\n请保持修改意图不变，优化实现方式。`);
+          break;
+        case 'stop':
+          if (this._abortController) {
+            this._abortController.abort();
+            this._abortController = null;
+          }
+          this._view?.webview.postMessage({ type: 'streamEnd' });
+          this._view.webview.html = getSidebarHtml([], false, vscode.l10n.t('Enter intent or click Generate'), this.currentModel);
+          this._view.title = vscode.l10n.t('AI Code Completion');
           break;
       }
     });
@@ -59,82 +71,63 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       const { documents, cursorFile, cursorLine, selectionStart, selectionEnd } = collectContext();
 
       if (documents.length === 0) {
-        this._view.webview.html = getSidebarHtml([], false, '请先打开代码文件', this.currentModel);
-        this._view.title = 'AI 代码补全';
+        this._view.webview.html = getSidebarHtml([], false, vscode.l10n.t('Open a code file first'), this.currentModel);
+        this._view.title = vscode.l10n.t('AI Code Completion');
         return;
       }
 
       const apiKey = (await this._secretStorage.get('aiCompletion.apiKey')) ?? '';
       if (!apiKey) {
-        this._view.webview.html = getSidebarHtml([], false, '请先在设置中配置 API Key', this.currentModel);
-        this._view.title = 'AI 代码补全';
+        this._view.webview.html = getSidebarHtml([], false, vscode.l10n.t('Configure API Key in settings first'), this.currentModel);
+        this._view.title = vscode.l10n.t('AI Code Completion');
         return;
       }
 
       // Switch to streaming view
       this._view.webview.html = getSidebarHtml([], false, '', this.currentModel, true);
-      this._view.title = 'AI 代码补全 (生成中...)';
+      this._view.title = vscode.l10n.t('AI Code Completion (generating...)');
+
+      this._abortController = new AbortController();
 
       const suggestions = await streamSuggestions(
         documents, cursorFile, cursorLine, userIntent, apiKey,
         (reasoning, content) => {
           this._view?.webview.postMessage({ type: 'streamChunk', reasoning, content });
         },
-        selectionStart, selectionEnd,
+        selectionStart, selectionEnd, this._abortController.signal,
       );
 
       // Streaming done — switch to card view
       this._view.webview.postMessage({ type: 'streamEnd' });
       this._view.webview.html = getSidebarHtml(suggestions, false, '', this.currentModel);
-      this._view.title = `AI 代码补全 (${suggestions.length} 个方案)`;
+      this._view.title = vscode.l10n.t('AI Code Completion ({count} suggestions)', { count: suggestions.length });
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      vscode.window.showErrorMessage(`[AI Completion] ${errMsg}`);
+      vscode.window.showErrorMessage(vscode.l10n.t('[AI Completion] {msg}', { msg: errMsg }));
       const displayMsg = errMsg.includes('Invalid model')
-        ? `模型无效，请运行命令 "AI Completion: Select Model" 选择合适的模型\n\n${errMsg}`
+        ? `${vscode.l10n.t('Invalid model run Select Model')}\n\n${errMsg}`
         : errMsg;
       this._view.webview.html = getSidebarHtml([], false, displayMsg, this.currentModel);
-      this._view.title = 'AI 代码补全';
+      this._view.title = vscode.l10n.t('AI Code Completion');
+    } finally {
+      this._abortController = null;
     }
   }
 
   private applySuggestion(suggestion: Suggestion): void {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
+    if (!suggestion.replacement) return;
 
-    try {
-      const edits = parseUnifiedDiff(suggestion.diff, editor.document);
-      if (edits.length === 0) {
-        vscode.window.showWarningMessage('未识别到可应用的改动');
-        return;
-      }
-
-      const edit = new vscode.WorkspaceEdit();
-      let skippedCount = 0;
-      for (const e of edits) {
-        if (e.contextLines && !contextMatches(editor.document, e)) {
-          skippedCount++;
-          continue;
-        }
-        edit.replace(editor.document.uri, e.range, e.newText);
-      }
-
-      if (skippedCount > 0) {
-        vscode.window.showWarningMessage(`${skippedCount} 处改动因文件已变化而跳过`);
-      }
-
-      if (edit.size > 0) {
-        vscode.workspace.applyEdit(edit).then(success => {
-          if (success) {
-            vscode.window.showInformationMessage(`已应用方案: ${suggestion.title}`);
-          }
-        }).catch(err => {
-          vscode.window.showErrorMessage(`应用失败: ${err.message}`);
-        });
-      }
-    } catch (e: unknown) {
-      vscode.window.showErrorMessage(`应用失败: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    const sel = editor.selection;
+    const range = sel.isEmpty
+      ? new vscode.Range(Math.max(0, sel.active.line - 30), 0, sel.active.line + 30, 0)
+      : new vscode.Range(sel.start.line, 0, sel.end.line, 0);
+    editor.edit(editBuilder => {
+      editBuilder.replace(range, suggestion.replacement!);
+    }).then(success => {
+      if (success) vscode.window.showInformationMessage(vscode.l10n.t('Applied: {title}', { title: suggestion.title }));
+    });
   }
 
   private viewDiff(suggestion: Suggestion): void {
@@ -146,7 +139,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     vscode.workspace.openTextDocument({ content: diffContent, language: 'diff' }).then(doc => {
       vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside });
     }, err => {
-      vscode.window.showErrorMessage(`打开 diff 失败: ${err.message}`);
+      vscode.window.showErrorMessage(vscode.l10n.t('Open diff failed: {msg}', { msg: err.message }));
     });
   }
 
@@ -155,18 +148,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const baseUrl = cfg.get<string>('apiBaseUrl', 'https://api.openai.com/v1');
     const apiKey = await this._secretStorage.get('aiCompletion.apiKey');
     if (!apiKey) {
-      vscode.window.showErrorMessage('请先配置 API Key');
+      vscode.window.showErrorMessage(vscode.l10n.t('Configure AI API Key first'));
       return;
     }
 
     const { listModels } = await import('./CompletionApi');
     const models = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: '正在获取模型列表...' },
+      { location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Fetching model list...') },
       async () => {
         try {
           return await listModels(baseUrl, apiKey);
         } catch (e: any) {
-          vscode.window.showErrorMessage(`获取模型列表失败: ${e.message}`);
+          vscode.window.showErrorMessage(vscode.l10n.t('Failed to fetch model list: {msg}', { msg: e.message }));
           return null;
         }
       }
@@ -176,13 +169,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     const current = cfg.get<string>('model', '');
     const selected = await vscode.window.showQuickPick(models, {
-      placeHolder: '选择 AI 模型',
+      placeHolder: vscode.l10n.t('Select AI model'),
       matchOnDescription: true,
     });
 
     if (selected) {
       await cfg.update('model', selected, vscode.ConfigurationTarget.Global);
-      vscode.window.showInformationMessage(`模型已切换为: ${selected}`);
+      vscode.window.showInformationMessage(vscode.l10n.t('Model switched to: {model}', { model: selected }));
       // Update sidebar header
       if (this._view) {
         this._view.webview.postMessage({ type: 'modelChanged', model: selected });
@@ -191,66 +184,3 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   }
 }
 
-interface DiffEdit {
-  range: vscode.Range;
-  newText: string;
-  contextLines?: { text: string; line: number }[];
-}
-
-function parseUnifiedDiff(diff: string, document: vscode.TextDocument): DiffEdit[] {
-  const edits: DiffEdit[] = [];
-  const lines = diff.split('\n');
-  let i = 0;
-
-  while (i < lines.length) {
-    const hunkMatch = lines[i].match(/^@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@/);
-    if (!hunkMatch) { i++; continue; }
-
-    const origStart = parseInt(hunkMatch[1]);
-    const origCount = parseInt(hunkMatch[2] || '1');
-
-    i++;
-    const contextLines: { text: string; line: number }[] = [];
-    const newLines: string[] = [];
-    let origLine = origStart;
-
-    while (i < lines.length && !lines[i].startsWith('@@')) {
-      const line = lines[i];
-      if (line.startsWith('-')) {
-        origLine++;
-      } else if (line.startsWith('+')) {
-        newLines.push(line.slice(1));
-      } else {
-        contextLines.push({ text: line.slice(1), line: origLine });
-        newLines.push(line.slice(1));
-        origLine++;
-      }
-      i++;
-    }
-
-    const range = new vscode.Range(
-      new vscode.Position(origStart - 1, 0),
-      new vscode.Position(origStart - 1 + origCount, 0)
-    );
-
-    edits.push({
-      range,
-      newText: newLines.join('\n') + (newLines.length > 0 ? '\n' : ''),
-      contextLines,
-    });
-  }
-
-  // Apply bottom-to-top to avoid line drift
-  edits.sort((a, b) => b.range.start.line - a.range.start.line);
-  return edits;
-}
-
-function contextMatches(document: vscode.TextDocument, edit: DiffEdit): boolean {
-  if (!edit.contextLines || edit.contextLines.length === 0) return true;
-  const first = edit.contextLines[0];
-  if (first.line <= document.lineCount) {
-    const actual = document.lineAt(first.line - 1).text;
-    return actual.trim() === first.text.trim();
-  }
-  return false;
-}

@@ -3,6 +3,7 @@ export interface Suggestion {
   description: string;
   file?: string;
   diff: string;
+  replacement?: string;
 }
 
 export interface ContextDocument {
@@ -17,6 +18,7 @@ export interface ContextDocument {
 
 export type WebViewMessage =
   | { type: 'applySuggestion'; suggestion: Suggestion }
+  | { type: 'resetSuggestion'; suggestion: Suggestion }
   | { type: 'regenerate'; userIntent: string }
   | { type: 'viewDiff'; suggestion: Suggestion }
   | { type: 'selectModel' };

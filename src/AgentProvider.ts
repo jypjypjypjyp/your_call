@@ -12,7 +12,7 @@ export class AgentProvider implements vscode.WebviewViewProvider {
 
   resolveWebviewView(vw: vscode.WebviewView): void {
     this._view = vw;
-    vw.webview.options = { enableScripts: true, localResourceRoots: [this._uri] };
+    vw.webview.options = { enableScripts: true, localResourceRoots: [this._uri], retainContextWhenHidden: true };
     vw.webview.html = this._buildHtml();
     vw.onDidDispose(() => this._kill());
     vw.webview.onDidReceiveMessage(m => {
@@ -43,7 +43,7 @@ body{margin:0;padding:0;background:var(--vscode-terminal-background);height:100v
 .b:hover{background:var(--vscode-button-hoverBackground)}
 .bd{background:var(--vscode-errorForeground)}.bd:hover{filter:brightness(1.2)}
 </style></head><body>
-<div class="tb"><button class="b" id="sb">▶ 启动</button><button class="b bd" id="sp" style="display:none">■ 停止</button><span class="h" id="ch"></span></div>
+<div class="tb"><button class="b" id="sb">▶ ${esc(vscode.l10n.t('Start'))}</button><button class="b bd" id="sp" style="display:none">■ ${esc(vscode.l10n.t('Stop'))}</button><span class="h" id="ch"></span></div>
 <div id="terminal"></div>
 <script>${xtermJs}
 ${fitAddonJs}
@@ -53,7 +53,7 @@ function gv(n){return getComputedStyle(document.documentElement).getPropertyValu
 const term=new Terminal({scrollback:200,cursorBlink:true,fontSize:13,fontFamily:getComputedStyle(document.body).fontFamily||'Consolas',
 theme:{
 background:gv('--vscode-terminal-background'),foreground:gv('--vscode-terminal-foreground'),
-cursor:'#ffffff',cursorAccent:'#000000',
+      cursor:gv('--vscode-terminal-foreground'),cursorAccent:gv('--vscode-terminal-background'),
 selectionBackground:gv('--vscode-editor-selectionBackground'),
 black:gv('--vscode-terminal-ansiBlack'),red:gv('--vscode-terminal-ansiRed'),green:gv('--vscode-terminal-ansiGreen'),yellow:gv('--vscode-terminal-ansiYellow'),
 blue:gv('--vscode-terminal-ansiBlue'),magenta:gv('--vscode-terminal-ansiMagenta'),cyan:gv('--vscode-terminal-ansiCyan'),white:gv('--vscode-terminal-ansiWhite'),
@@ -70,25 +70,24 @@ window.addEventListener('message',e=>{const m=e.data;
 if(m.type==='s'){document.getElementById('sb').style.display='none';document.getElementById('sp').style.display='';term.focus()}
 if(m.type==='x'){document.getElementById('sb').style.display='';document.getElementById('sp').style.display='none'}
 if(m.type==='o'){term.write(m.t)}
-if(m.type==='e')term.write('\\r\\n错误: '+m.t+'\\r\\n').then(()=>{document.getElementById('sb').style.display='';document.getElementById('sp').style.display='none'})
+if(m.type==='e')term.write('\\r\\n${esc(vscode.l10n.t('Error: {msg}', { msg: '' }))}'+m.t+'\\r\\n').then(()=>{document.getElementById('sb').style.display='';document.getElementById('sp').style.display='none'})
 if(m.type==='c'){document.getElementById('ch').textContent=m.t}});
 document.getElementById('sb').addEventListener('click',()=>v.postMessage({type:'start'}));
 document.getElementById('sp').addEventListener('click',()=>v.postMessage({type:'stop'}));
-}catch(e){const el=document.getElementById('terminal');if(el)el.textContent='初始化失败: '+e.message}})()</script></body></html>`;
+}catch(e){const el=document.getElementById('terminal');if(el)el.textContent='${esc(vscode.l10n.t('Init failed: {msg}', { msg: '' }))}'+e.message}})()</script></body></html>`;
   }
 
   private _start(): void {
     const raw = (vscode.workspace.getConfiguration('aiCompletion').get<string>('agentCommand', '') || '').trim();
     if (!raw) {
-      vscode.window.showErrorMessage('请先在设置 aiCompletion.agentCommand 中配置命令');
+      vscode.window.showErrorMessage(vscode.l10n.t('Configure aiCompletion.agentCommand in settings'));
       return;
     }
 
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
     const isWin = process.platform === 'win32';
-    const parts = raw.split(/\s+/);
-    const shellCmd = isWin ? 'cmd.exe' : parts[0];
-    const shellArgs = isWin ? ['/c', `chcp 65001 > NUL & ${raw}`] : parts.slice(1);
+    const shellCmd = isWin ? 'cmd.exe' : 'sh';
+    const shellArgs = isWin ? ['/c', `chcp 65001 > NUL & ${raw}`] : ['-c', raw];
 
     this._view?.webview.postMessage({ type: 'c', t: raw });
 
@@ -114,7 +113,7 @@ document.getElementById('sp').addEventListener('click',()=>v.postMessage({type:'
           this._view?.webview.postMessage({ type: 'o', t: _buf });
           _buf = '';
           _tid = null;
-        }, 80);
+        }, 16);
       });
 
       this._pty.onExit(() => {
@@ -123,9 +122,9 @@ document.getElementById('sp').addEventListener('click',()=>v.postMessage({type:'
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      this._view?.webview.postMessage({ type: 'o', t: `\r\n启动失败: ${msg}\r\n` });
+      this._view?.webview.postMessage({ type: 'o', t: `\r\n${vscode.l10n.t('Start failed: {msg}', { msg })}\r\n` });
       this._view?.webview.postMessage({ type: 'e', t: msg });
-      vscode.window.showErrorMessage(`Agent CLI 启动失败: ${msg}`);
+      vscode.window.showErrorMessage(vscode.l10n.t('Agent CLI start failed: {msg}', { msg }));
     }
   }
 
@@ -133,4 +132,8 @@ document.getElementById('sp').addEventListener('click',()=>v.postMessage({type:'
     if (this._pty) { this._pty.kill(); this._pty = null; }
     this._view?.webview.postMessage({ type: 'x' });
   }
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
