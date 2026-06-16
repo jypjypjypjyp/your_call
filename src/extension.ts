@@ -11,17 +11,11 @@ function ensureNodePty(context: vscode.ExtensionContext, force = false): void {
   if (!force && fs.existsSync(nodePtyDir)) return;
 
   const extDir = context.extensionUri.fsPath;
-  const isWin = process.platform === 'win32';
   const terminal = vscode.window.createTerminal({
     name: 'YourCall: Install node-pty',
+    cwd: extDir,
   });
-
-  if (isWin) {
-    terminal.sendText(`cd /d "${extDir.replace(/"/g, '\\"')}" && npm install node-pty`, true);
-  } else {
-    const escaped = extDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$');
-    terminal.sendText(`cd "${escaped}" && npm install node-pty`, true);
-  }
+  terminal.sendText('npm install node-pty', true);
   terminal.show();
 }
 

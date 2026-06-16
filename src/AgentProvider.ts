@@ -15,11 +15,22 @@ export class AgentProvider implements vscode.WebviewViewProvider {
     vw.webview.options = { enableScripts: true, localResourceRoots: [this._uri] };
     vw.webview.html = this._buildHtml();
     vw.onDidDispose(() => this._kill());
-    vw.webview.onDidReceiveMessage(m => {
+    vw.webview.onDidReceiveMessage(async m => {
       if (m.type === 'start') this._start(m.cmd as string | undefined);
       else if (m.type === 'stop') this._kill();
       else if (m.type === 'data' && this._pty) this._pty.write(m.text);
       else if (m.type === 'resize' && this._pty) this._pty.resize(m.cols, m.rows);
+      else if (m.type === 'openFile') {
+        const ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+        const fp = path.isAbsolute(m.path) ? m.path : path.join(ws, m.path);
+        try {
+          const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fp));
+          const ln = Math.max((m.line || 1) - 1, 0);
+          const co = Math.max((m.column || 1) - 1, 0);
+          const pos = new vscode.Position(ln, co);
+          await vscode.window.showTextDocument(doc, { selection: new vscode.Range(pos, pos), preview: false });
+        } catch { /* file not found */ }
+      }
     });
   }
 
@@ -35,49 +46,23 @@ export class AgentProvider implements vscode.WebviewViewProvider {
       fitAddonJs = fs.readFileSync(path.join(extPath, 'node_modules', '@xterm', 'addon-fit', 'lib', 'addon-fit.js'), 'utf8');
     } catch { /* files not available */ }
 
-    return `<!DOCTYPE html><html><head><style>${xtermCss}
-body{margin:0;padding:0;background:var(--vscode-terminal-background);height:100vh;overflow:hidden;font-family:var(--vscode-editor-font-family);display:flex;flex-direction:column}
-#terminal{flex:1;width:100%;min-height:0}
-.tb{display:flex;gap:4px;padding:4px 8px;background:var(--vscode-sideBarSectionHeader-background);border-bottom:1px solid var(--vscode-sideBar-border);align-items:center}
-.tb .h{flex:1;font-size:11px;color:var(--vscode-descriptionForeground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
-.ci{flex:1;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);border-radius:3px;padding:2px 6px;font-size:11px;font-family:inherit;outline:none;min-width:0}
-.ci:focus{border-color:var(--vscode-focusBorder)}
-.b{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:3px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit}
-.b:hover{background:var(--vscode-button-hoverBackground)}
-.bd{background:var(--vscode-errorForeground)}.bd:hover{filter:brightness(1.2)}
-</style></head><body>
-<div class="tb"><button class="b" id="sb">▶ ${esc(vscode.l10n.t('Start'))}</button><button class="b bd" id="sp" style="display:none">■ ${esc(vscode.l10n.t('Stop'))}</button><input class="ci" id="ch" type="text" placeholder="${esc(vscode.l10n.t('agent command'))}" value="${defaultCmd}"></div>
-<div id="terminal"></div>
-<script>${xtermJs}
-${fitAddonJs}
-(function(){try{
-const v=acquireVsCodeApi();
-function gv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#000'}
-const term=new Terminal({scrollback:200,cursorBlink:true,fontSize:13,fontFamily:getComputedStyle(document.body).fontFamily||'Consolas',
-theme:{
-background:gv('--vscode-terminal-background'),foreground:gv('--vscode-terminal-foreground'),
-      cursor:gv('--vscode-terminal-foreground'),cursorAccent:gv('--vscode-terminal-background'),
-selectionBackground:gv('--vscode-editor-selectionBackground'),
-black:gv('--vscode-terminal-ansiBlack'),red:gv('--vscode-terminal-ansiRed'),green:gv('--vscode-terminal-ansiGreen'),yellow:gv('--vscode-terminal-ansiYellow'),
-blue:gv('--vscode-terminal-ansiBlue'),magenta:gv('--vscode-terminal-ansiMagenta'),cyan:gv('--vscode-terminal-ansiCyan'),white:gv('--vscode-terminal-ansiWhite'),
-brightBlack:gv('--vscode-terminal-ansiBrightBlack'),brightRed:gv('--vscode-terminal-ansiBrightRed'),brightGreen:gv('--vscode-terminal-ansiBrightGreen'),brightYellow:gv('--vscode-terminal-ansiBrightYellow'),
-brightBlue:gv('--vscode-terminal-ansiBrightBlue'),brightMagenta:gv('--vscode-terminal-ansiBrightMagenta'),brightCyan:gv('--vscode-terminal-ansiBrightCyan'),brightWhite:gv('--vscode-terminal-ansiBrightWhite')
-}});
-const fit=new FitAddon.FitAddon();term.loadAddon(fit);
-term.open(document.getElementById('terminal'));
-fit.fit();
-term.onData(d=>v.postMessage({type:'data',text:d}));
-let rt;const ro=new ResizeObserver(()=>{clearTimeout(rt);rt=setTimeout(()=>{fit.fit();v.postMessage({type:'resize',cols:term.cols,rows:term.rows})},100)});
-ro.observe(document.getElementById('terminal'));
-window.addEventListener('message',e=>{const m=e.data;
-if(m.type==='s'){document.getElementById('sb').style.display='none';document.getElementById('sp').style.display='';term.focus()}
-if(m.type==='x'){document.getElementById('sb').style.display='';document.getElementById('sp').style.display='none'}
-if(m.type==='o'){term.write(m.t)}
-if(m.type==='e')term.write('\\r\\n${esc(vscode.l10n.t('Error: {msg}', { msg: '' }))}'+m.t+'\\r\\n').then(()=>{document.getElementById('sb').style.display='';document.getElementById('sp').style.display='none'})
-if(m.type==='c'){document.getElementById('ch').value=m.t}});
-document.getElementById('sb').addEventListener('click',()=>v.postMessage({type:'start',cmd:document.getElementById('ch').value}));
-document.getElementById('sp').addEventListener('click',()=>v.postMessage({type:'stop'}));
-}catch(e){const el=document.getElementById('terminal');if(el)el.textContent='${esc(vscode.l10n.t('Init failed: {msg}', { msg: '' }))}'+e.message}})()</script></body></html>`;
+    const agentJsUri = this._view?.webview.asWebviewUri(vscode.Uri.joinPath(this._uri, 'media', 'agent.js'));
+    let template = '';
+    try {
+      template = fs.readFileSync(path.join(extPath, 'media', 'agent.html'), 'utf8');
+    } catch { return ''; }
+
+    return template
+      .replace('{{XTERM_CSS}}', `<style>${xtermCss}</style>`)
+      .replace('{{XTERM_JS}}', `<script>${xtermJs}</script>`)
+      .replace('{{FIT_JS}}', `<script>${fitAddonJs}</script>`)
+      .replace('{{AGENT_JS_URI}}', String(agentJsUri || ''))
+      .replace(/{{START_BTN}}/g, esc(vscode.l10n.t('Start')))
+      .replace(/{{STOP_BTN}}/g, esc(vscode.l10n.t('Stop')))
+      .replace(/{{CMD_PLACEHOLDER}}/g, esc(vscode.l10n.t('agent command')))
+      .replace(/{{DEFAULT_CMD}}/g, defaultCmd)
+      .replace(/{{INIT_FAILED_MSG}}/g, esc(vscode.l10n.t('Init failed: {msg}', { msg: '' })))
+      .replace(/{{ERROR_MSG}}/g, esc(vscode.l10n.t('Error: {msg}', { msg: '' })));
   }
 
   private _start(cmdOverride?: string): void {

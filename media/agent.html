@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+{{XTERM_CSS}}
+<style>
+body{margin:0;padding:0;background:var(--vscode-terminal-background);height:100vh;overflow:hidden;font-family:var(--vscode-editor-font-family);display:flex;flex-direction:column}
+#terminal{flex:1;width:100%;min-height:0}
+.tb{display:flex;gap:4px;padding:4px 8px;background:var(--vscode-sideBarSectionHeader-background);border-bottom:1px solid var(--vscode-sideBar-border);align-items:center}
+.tb .h{flex:1;font-size:11px;color:var(--vscode-descriptionForeground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
+.ci{flex:1;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border);border-radius:3px;padding:2px 6px;font-size:11px;font-family:inherit;outline:none;min-width:0}
+.ci:focus{border-color:var(--vscode-focusBorder)}
+.b{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:3px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit}
+.b:hover{background:var(--vscode-button-hoverBackground)}
+.bd{background:var(--vscode-errorForeground)}.bd:hover{filter:brightness(1.2)}
+.xterm-link-hover{cursor:pointer;text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="tb">
+  <button class="b" id="sb">▶ {{START_BTN}}</button>
+  <button class="b bd" id="sp" style="display:none">■ {{STOP_BTN}}</button>
+  <input class="ci" id="ch" type="text" placeholder="{{CMD_PLACEHOLDER}}" value="{{DEFAULT_CMD}}">
+</div>
+<div id="terminal"></div>
+{{XTERM_JS}}
+{{FIT_JS}}
+<script>
+window.__agentConfig = {
+  startBtn: "{{START_BTN}}",
+  stopBtn: "{{STOP_BTN}}",
+  cmdPlaceholder: "{{CMD_PLACEHOLDER}}",
+  initFailedMsg: "{{INIT_FAILED_MSG}}",
+  errorMsg: "{{ERROR_MSG}}"
+};
+</script>
+<script src="{{AGENT_JS_URI}}"></script>
+</body>
+</html>
